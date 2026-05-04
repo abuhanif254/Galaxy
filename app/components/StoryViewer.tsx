@@ -2,6 +2,10 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
+import { query, collection, where, getDocs, setDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { useAuthStore } from '@/lib/auth-store';
+import { useToast } from './ui/use-toast';
 
 interface Story {
   id: string;
@@ -24,6 +28,8 @@ interface Props {
 const STORY_DURATION = 5000; // 5 seconds per story
 
 export default function StoryViewer({ stories, initialIndex, onClose }: Props) {
+  const { user } = useAuthStore();
+  const { toast } = useToast();
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [progress, setProgress] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -100,6 +106,63 @@ export default function StoryViewer({ stories, initialIndex, onClose }: Props) {
 
   const currentStory = stories[currentIndex];
 
+  const handleReact = async (emoji: string) => {
+    if (!user || !currentStory || user.uid === currentStory.authorId) return;
+
+    // Pause while sending
+    setIsPaused(true);
+    const msgText = `${emoji} Reacted to your story`;
+    try {
+      const q = query(
+        collection(db, 'chats'),
+        where('participantIds', 'array-contains', user.uid)
+      );
+      const snapshot = await getDocs(q);
+      let targetChatId = null;
+
+      for (const d of snapshot.docs) {
+        const data = d.data();
+        if (data.participantIds.includes(currentStory.authorId)) {
+          targetChatId = d.id;
+          break;
+        }
+      }
+
+      if (!targetChatId) {
+        targetChatId = `chat_${Date.now()}_${Math.random().toString(36).substring(2,7)}`;
+        await setDoc(doc(db, 'chats', targetChatId), {
+          participantIds: [user.uid, currentStory.authorId],
+          updatedAt: serverTimestamp(),
+          lastMessage: msgText,
+          lastMessageTime: Date.now()
+        });
+      }
+
+      const messageId = `msg_${Date.now()}_${Math.random().toString(36).substring(2,9)}`;
+      await setDoc(doc(db, `chats/${targetChatId}/messages`, messageId), {
+        authorId: user.uid,
+        text: msgText,
+        createdAt: serverTimestamp(),
+      });
+
+      await updateDoc(doc(db, 'chats', targetChatId), {
+        updatedAt: serverTimestamp(),
+        lastMessage: msgText,
+        lastMessageTime: Date.now()
+      });
+
+      toast({
+        title: "Reaction Sent!",
+        description: `Sent ${emoji} to ${currentStory.authorProfile?.username || 'user'}`
+      });
+
+      handleNext();
+    } catch (e) {
+      handleFirestoreError(e, OperationType.CREATE, 'chats messages reaction');
+    }
+    setIsPaused(false);
+  };
+
   if (!currentStory) return null;
 
   return (
@@ -147,7 +210,7 @@ export default function StoryViewer({ stories, initialIndex, onClose }: Props) {
          </button>
 
          {/* Content */}
-         <div className="flex-1 overflow-hidden flex items-center justify-center">
+         <div className="flex-1 overflow-hidden flex items-center justify-center relative touch-none pointer-events-none">
             <img 
                src={currentStory.imageUrl} 
                alt="Story" 
@@ -159,6 +222,21 @@ export default function StoryViewer({ stories, initialIndex, onClose }: Props) {
          {/* Navigation Overlays (visible on desktop hover, mainly just hit areas) */}
          <div className="absolute inset-y-0 left-0 w-[30%] z-0" />
          <div className="absolute inset-y-0 right-0 w-[70%] z-0" />
+
+         {/* Reaction Bar */}
+         {user && user.uid !== currentStory.authorId && (
+            <div className="absolute bottom-4 sm:bottom-6 left-0 right-0 z-30 flex justify-center gap-4 px-4 pointer-events-auto">
+               {['🔥', '❤️', '😂', '😮'].map(emoji => (
+                 <button 
+                    key={emoji}
+                    onClick={(e) => { e.stopPropagation(); handleReact(emoji); }}
+                    className="w-12 h-12 bg-black/40 hover:bg-black/80 backdrop-blur-md rounded-full text-2xl flex items-center justify-center transition-transform hover:scale-110 active:scale-95 text-white shadow-lg"
+                 >
+                    {emoji}
+                 </button>
+               ))}
+            </div>
+         )}
       </div>
     </div>
   );

@@ -50,16 +50,17 @@ export default function Feed() {
   useEffect(() => {
     if (!user) return;
     
-    // Fetch stories from self for now to avoid the complex `isFriend` query requirement
+    // Fetch stories globally for preview purposes
     setLoadingStories(true);
-    const usq = query(collection(db, 'stories'), where('authorId', '==', user.uid));
+    const usq = query(collection(db, 'stories'), orderBy('createdAt', 'desc'), limit(50));
     const unsubStories = onSnapshot(usq, async (snapshot) => {
       const data: Story[] = [];
       const userCache: Record<string, any> = {};
+      const now = Date.now();
       
       for (const d of snapshot.docs) {
         const s = { id: d.id, ...d.data() } as Story;
-        if (s.expiresAt > Date.now()) {
+        if (s.expiresAt > now) {
           if (!userCache[s.authorId]) {
             const uprof = await getDoc(doc(db, 'users', s.authorId));
             if (uprof.exists()) userCache[s.authorId] = uprof.data();
@@ -68,7 +69,9 @@ export default function Feed() {
           data.push(s);
         }
       }
-      data.sort((a, b) => b.createdAt - a.createdAt);
+      
+      // Group by user, showing latest story first or list of distinct users
+      // For simplicity in the UI right now, we can just show flat stories
       setStories(data);
       setLoadingStories(false);
     });

@@ -204,10 +204,7 @@ service cloud.firestore {
 
     // --- Stories ---
     match /stories/{storyId} {
-      allow get, list: if isSignedIn() && (
-        resource.data.authorId == request.auth.uid ||
-        isFriend(resource.data.authorId, request.auth.uid)
-      );
+      allow get, list: if isSignedIn();
       allow create: if isSignedIn() && isValidId(storyId)
                     && incoming().keys().hasOnly(['authorId', 'imageUrl', 'expiresAt', 'createdAt'])
                     && incoming().keys().size() == 4
