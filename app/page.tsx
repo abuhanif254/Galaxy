@@ -3,6 +3,7 @@
 import { useAuthStore } from '@/lib/auth-store';
 import { Camera, Users, Image as ImageIcon, Heart, Bell, User as UserIcon, Search, MessageCircle } from 'lucide-react';
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import Feed from './components/Feed';
 import Groups from './components/Groups';
 import Notifications from './components/Notifications';
@@ -81,12 +82,23 @@ export default function Home() {
         </header>
 
         <div className="flex-1 w-full flex flex-col pt-2 md:p-8">
-           {activeTab === 'feed' && <Feed />}
-           {activeTab === 'discover' && <div className="px-4"><Discover /></div>}
-           {activeTab === 'messages' && <div className="px-0 md:px-4 flex-1 flex flex-col"><Messages /></div>}
-           {activeTab === 'groups' && <div className="px-4"><Groups /></div>}
-           {activeTab === 'notifications' && <div className="px-4"><Notifications /></div>}
-           {activeTab === 'profile' && <div className="px-4"><Profile /></div>}
+           <AnimatePresence mode="wait">
+             <motion.div
+               key={activeTab}
+               initial={{ opacity: 0, y: 10 }}
+               animate={{ opacity: 1, y: 0 }}
+               exit={{ opacity: 0, y: -10 }}
+               transition={{ duration: 0.2 }}
+               className="flex-1 flex flex-col"
+             >
+               {activeTab === 'feed' && <Feed />}
+               {activeTab === 'discover' && <div className="px-4"><Discover /></div>}
+               {activeTab === 'messages' && <div className="px-0 md:px-4 flex-1 flex flex-col"><Messages /></div>}
+               {activeTab === 'groups' && <div className="px-4"><Groups /></div>}
+               {activeTab === 'notifications' && <div className="px-4"><Notifications /></div>}
+               {activeTab === 'profile' && <div className="px-4"><Profile /></div>}
+             </motion.div>
+           </AnimatePresence>
         </div>
       </main>
     </div>

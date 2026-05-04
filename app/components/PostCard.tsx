@@ -7,6 +7,7 @@ import { MessageCircle, Heart, Share, MoreHorizontal } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { useToast } from './ui/use-toast';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface Post {
   id: string;
@@ -39,6 +40,7 @@ export default function PostCard({ post }: { post: Post }) {
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
+  const [showHeartOverlay, setShowHeartOverlay] = useState(false);
 
   // Fetch Author Info
   useEffect(() => {
@@ -70,6 +72,17 @@ export default function PostCard({ post }: { post: Post }) {
     });
     return () => unsub();
   }, [post.id, showComments]);
+
+  const handleDoubleClickLike = async () => {
+    if (!user) return;
+    setShowHeartOverlay(true);
+    setTimeout(() => setShowHeartOverlay(false), 1000); // hide after 1s
+    
+    if (!hasLiked) {
+      const likeRef = doc(db, `posts/${post.id}/likes`, user.uid);
+      await setDoc(likeRef, { createdAt: serverTimestamp() });
+    }
+  };
 
   const toggleLike = async () => {
     if (!user) return;
@@ -125,20 +138,38 @@ export default function PostCard({ post }: { post: Post }) {
       </div>
 
       {/* Image */}
-      <div className="w-full bg-black flex items-center justify-center max-h-[600px] overflow-hidden" onDoubleClick={toggleLike}>
+      <div className="w-full bg-black flex items-center justify-center max-h-[600px] overflow-hidden relative" onDoubleClick={handleDoubleClickLike}>
         <img 
           src={post.imageUrl} 
           alt="Post content" 
           className="w-full object-contain"
         />
+        <AnimatePresence>
+          {showHeartOverlay && (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.5 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              className="absolute inset-0 flex items-center justify-center pointer-events-none"
+            >
+               <Heart className="w-32 h-32 fill-white text-white drop-shadow-2xl" />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Actions */}
       <div className="p-4 space-y-4">
         <div className="flex items-center gap-6">
-          <button onClick={toggleLike} className="flex items-center gap-2 group">
-            <Heart className={`w-7 h-7 sm:w-8 sm:h-8 transition ${hasLiked ? 'fill-red-500 text-red-500 transform scale-110' : 'text-zinc-600 dark:text-zinc-300 group-hover:text-red-500'}`} />
-          </button>
+          <motion.button 
+            whileTap={{ scale: 0.8 }}
+            transition={{ type: "spring", stiffness: 400, damping: 17 }}
+            onClick={toggleLike} 
+            className="flex items-center gap-2 group"
+          >
+            <Heart className={`w-7 h-7 sm:w-8 sm:h-8 transition-colors ${hasLiked ? 'fill-red-500 text-red-500' : 'text-zinc-600 dark:text-zinc-300 group-hover:text-red-500'}`} />
+          </motion.button>
           <button onClick={() => setShowComments(!showComments)} className="flex items-center gap-2 group text-zinc-600 dark:text-zinc-300 hover:text-blue-500 transition">
             <MessageCircle className="w-7 h-7 sm:w-8 sm:h-8 transform group-hover:-scale-x-100 transition" />
           </button>

@@ -9,6 +9,7 @@ import { Plus } from 'lucide-react';
 import PhotoUpload from './PhotoUpload';
 import StoryViewer from './StoryViewer';
 import { PostSkeleton, StorySkeleton } from './Skeletons';
+import { motion } from 'motion/react';
 
 interface Post {
   id: string;
@@ -176,16 +177,29 @@ export default function Feed() {
              <PostSkeleton />
            </>
         ) : (
-          <>
+           <motion.div
+             initial="hidden"
+             animate="show"
+             variants={{
+               hidden: { opacity: 0 },
+               show: { opacity: 1, transition: { staggerChildren: 0.1 } }
+             }}
+             className="space-y-2 md:space-y-6"
+           >
             {posts.map(post => (
-              <PostCard key={post.id} post={post} />
+              <motion.div key={post.id} variants={{
+                hidden: { opacity: 0, y: 20 },
+                show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+              }}>
+                <PostCard post={post} />
+              </motion.div>
             ))}
             {posts.length === 0 && (
               <div className="text-center py-12 text-zinc-500">
                 No posts found here. Be the first to share!
               </div>
             )}
-          </>
+           </motion.div>
         )}
       </div>
 

@@ -6,6 +6,7 @@ import { collection, query, onSnapshot, orderBy, where, doc, updateDoc } from 'f
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { useEffect, useState, useRef } from 'react';
 import { Settings, Image as ImageIcon, Camera } from 'lucide-react';
+import { motion } from 'motion/react';
 import PostCard from './PostCard';
 
 interface Post {
@@ -95,10 +96,28 @@ export default function Profile() {
 
   if (!profile) return null;
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1 }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0, transition: { type: "spring" as const, stiffness: 300, damping: 24 } }
+  };
+
   return (
-    <div className="space-y-8">
+    <motion.div 
+      variants={containerVariants}
+      initial="hidden"
+      animate="show"
+      className="space-y-8"
+    >
       {/* Profile Header */}
-      <div className="bg-white dark:bg-zinc-900 rounded-3xl p-6 border border-zinc-200 dark:border-zinc-800 flex flex-col md:flex-row items-center md:items-start gap-6">
+      <motion.div variants={itemVariants} className="bg-white dark:bg-zinc-900 rounded-3xl p-6 border border-zinc-200 dark:border-zinc-800 flex flex-col md:flex-row items-center md:items-start gap-6">
         <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
           <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-4 border-white dark:border-zinc-900 shadow-lg bg-zinc-200 dark:bg-zinc-800">
             {profile.avatarUrl ? (
@@ -171,10 +190,10 @@ export default function Profile() {
              )}
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Grid of Posts */}
-      <div className="space-y-4">
+      <motion.div variants={itemVariants} className="space-y-4">
         <h2 className="font-bold text-xl px-2">Your Posts</h2>
         {posts.length === 0 ? (
            <div className="text-center py-16 px-4 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-3xl">
@@ -183,20 +202,25 @@ export default function Profile() {
              <p className="text-zinc-500">Capture and share your first memory.</p>
            </div>
         ) : (
-           <div className="grid grid-cols-3 gap-1 md:gap-4">
+           <motion.div 
+             variants={containerVariants}
+             initial="hidden"
+             animate="show"
+             className="grid grid-cols-3 gap-1 md:gap-4"
+           >
              {posts.map(post => (
-               <div key={post.id} className="aspect-square bg-zinc-200 dark:bg-zinc-800 relative group overflow-hidden md:rounded-2xl cursor-pointer">
+               <motion.div variants={itemVariants} key={post.id} className="aspect-square bg-zinc-200 dark:bg-zinc-800 relative group overflow-hidden md:rounded-2xl cursor-pointer">
                  <img src={post.imageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
                     <div className="flex items-center gap-1 text-white font-semibold">
                       <span className="text-lg">❤️</span> {post.likeCount}
                     </div>
                  </div>
-               </div>
+               </motion.div>
              ))}
-           </div>
+           </motion.div>
         )}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
