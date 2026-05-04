@@ -1,20 +1,48 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Circled
 
-# Run and deploy your AI Studio app
+Circled is a modern, real-time social media application built with Next.js, Firebase, and Tailwind CSS. It features a polished, fluid user interface inspired by native iOS apps, utilizing Framer Motion for buttery-smooth animations and transitions.
 
-This contains everything you need to run your app locally.
+## 🌟 Key Features
 
-View your app in AI Studio: https://ai.studio/apps/2e079bbb-c1bc-4da8-8b38-db67fa0ae516
+- **Fluid UI & Animations:** Seamless page transitions and bouncy micro-interactions (e.g., double-tap to like with a pop effect).
+- **Real-Time Chat & Messaging:** Connect directly with friends using instant messaging powered by Firestore.
+- **Masonry Profile Grid:** A high-end, visually dynamic profile layout that respects original photo aspect ratios.
+- **Nested Comments & Mentions:** Threaded replies and `@username` tagging that trigger real-time alerts.
+- **Circles (Groups):** Create or join specialized groups and share content with specific communities.
+- **Instant Notifications:** Stay up-to-date with alerts for likes, friend requests, event invites, and mentions.
 
-## Run Locally
+## 🛠 Tech Stack
 
-**Prerequisites:**  Node.js
+- **Framework:** [Next.js](https://nextjs.org/) (App Router, React 19)
+- **Styling:** [Tailwind CSS v4](https://tailwindcss.com/)
+- **Backend:** [Firebase](https://firebase.google.com/) (Firestore database, Firebase Authentication)
+- **Animations:** [Motion](https://motion.dev/) (Framer Motion)
+- **Icons:** [Lucide React](https://lucide.dev/)
 
+## 🚀 Getting Started
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+1. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+2. **Configure Firebase:**
+   Using the AI Studio platform? Ensure your project is integrated via the `set_up_firebase` tool or ensure your configurations are correctly populated in `firebase-applet-config.json`.
+
+3. **Start the development server:**
+   ```bash
+   npm run dev
+   ```
+
+4. Open [http://localhost:3000](http://localhost:3000) with your browser to explore the app.
+
+## 📂 Project Structure
+
+- `app/`: Core route entry and layout definitions (Next.js App Router).
+- `app/components/`: Modular UI units including `Feed`, `PostCard`, `Messages`, `Profile`, and `Groups`.
+- `lib/`: Configuration logic for the Firebase client (`firebase.ts`) and global state management (`auth-store.ts`).
+- `firestore.rules`: Comprehensive, secure access control rules restricting interactions based on zero-trust principles.
+
+## 🔐 Security & Access
+
+The Firestore configuration utilizes **Attribute-Based Access Control (ABAC)**. Read, write, schema validations, and relational logic checks are executed directly at the database level to ensure that state manipulation is strongly guarded against anomalies or unauthorized exploitation.
