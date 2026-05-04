@@ -2,7 +2,7 @@
 
 export function PostSkeleton() {
   return (
-    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl overflow-hidden shadow-sm animate-pulse">
+    <div className="bg-white dark:bg-zinc-900 border-y md:border md:border-zinc-200 dark:border-zinc-800 md:rounded-3xl overflow-hidden shadow-sm animate-pulse mb-4 md:mb-0">
       {/* Header */}
       <div className="p-4 flex items-center justify-between">
         <div className="flex items-center gap-3">

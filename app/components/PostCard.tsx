@@ -6,6 +6,7 @@ import { collection, doc, query, onSnapshot, setDoc, deleteDoc, orderBy, serverT
 import { MessageCircle, Heart, Share, MoreHorizontal } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
+import { useToast } from './ui/use-toast';
 
 interface Post {
   id: string;
@@ -32,6 +33,7 @@ interface Comment {
 
 export default function PostCard({ post }: { post: Post }) {
   const { user } = useAuthStore();
+  const { toast } = useToast();
   const [author, setAuthor] = useState<UserProfile | null>(null);
   const [hasLiked, setHasLiked] = useState(false);
   const [showComments, setShowComments] = useState(false);
@@ -91,8 +93,17 @@ export default function PostCard({ post }: { post: Post }) {
     setNewComment('');
   };
 
+  const handleShare = () => {
+    // In a real app we'd share the actual URL, but we just use this to show off the toast
+    navigator.clipboard.writeText(`https://circled.app/post/${post.id}`);
+    toast({
+      title: "Link copied!",
+      description: "Post link has been copied to your clipboard.",
+    });
+  };
+
   return (
-    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl overflow-hidden shadow-sm">
+    <div className="bg-white dark:bg-zinc-900 border-y md:border md:border-zinc-200 dark:border-zinc-800 md:rounded-3xl overflow-hidden shadow-sm">
       {/* Header */}
       <div className="p-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -131,7 +142,7 @@ export default function PostCard({ post }: { post: Post }) {
           <button onClick={() => setShowComments(!showComments)} className="flex items-center gap-2 group text-zinc-600 dark:text-zinc-300 hover:text-blue-500 transition">
             <MessageCircle className="w-7 h-7 sm:w-8 sm:h-8 transform group-hover:-scale-x-100 transition" />
           </button>
-          <button className="flex items-center gap-2 group text-zinc-600 dark:text-zinc-300 hover:text-green-500 transition ml-auto">
+          <button onClick={handleShare} className="flex items-center gap-2 group text-zinc-600 dark:text-zinc-300 hover:text-green-500 transition ml-auto">
              <Share className="w-6 h-6 sm:w-7 sm:h-7" />
           </button>
         </div>

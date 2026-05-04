@@ -105,7 +105,7 @@ export default function Feed() {
   return (
     <div className="space-y-6">
       {/* Stories */}
-      <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
+      <div className="flex gap-4 overflow-x-auto pb-4 px-4 md:px-0 no-scrollbar">
         <button 
           onClick={() => setShowUpload('story')}
           className="flex-shrink-0 w-16 h-16 rounded-full border-2 border-dashed border-zinc-300 dark:border-zinc-700 flex items-center justify-center text-zinc-500 hover:text-blue-500 hover:border-blue-500 transition-colors"
@@ -139,20 +139,22 @@ export default function Feed() {
       )}
 
       {/* Post Creation Prompt */}
-      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 flex gap-3 items-center shadow-sm">
-        <div className="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden flex-shrink-0">
-           <img src={user?.photoURL || `https://api.dicebear.com/9.x/notionists/svg?seed=${user?.uid}`} className="w-full h-full object-cover"/>
+      <div className="px-4 md:px-0">
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 flex gap-3 items-center shadow-sm">
+          <div className="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden flex-shrink-0">
+             <img src={user?.photoURL || `https://api.dicebear.com/9.x/notionists/svg?seed=${user?.uid}`} className="w-full h-full object-cover"/>
+          </div>
+          <button 
+            onClick={() => setShowUpload('post')}
+            className="flex-1 bg-zinc-100 dark:bg-zinc-800/50 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-left px-4 py-2.5 rounded-full text-zinc-500 transition-colors"
+          >
+            Share a photo...
+          </button>
         </div>
-        <button 
-          onClick={() => setShowUpload('post')}
-          className="flex-1 bg-zinc-100 dark:bg-zinc-800/50 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-left px-4 py-2.5 rounded-full text-zinc-500 transition-colors"
-        >
-          Share a photo...
-        </button>
       </div>
 
       {/* Feed Filters */}
-      <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-2">
+      <div className="px-4 md:px-0 flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-2">
         <button 
           onClick={() => setActiveFilter('global')}
           className={`px-4 py-2 font-semibold text-sm rounded-full transition-colors ${activeFilter === 'global' ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900' : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
@@ -167,7 +169,7 @@ export default function Feed() {
         </button>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-2 md:space-y-6 pb-20 md:pb-0">
         {loadingPosts ? (
            <>
              <PostSkeleton />

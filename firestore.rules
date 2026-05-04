@@ -215,5 +215,34 @@ service cloud.firestore {
       allow delete: if isSignedIn() && request.auth.uid == existing().authorId;
     }
 
+    // --- Chats ---
+    match /chats/{chatId} {
+      allow get, list: if isSignedIn() && request.auth.uid in resource.data.participantIds;
+      allow create: if isSignedIn() && isValidId(chatId)
+                    && incoming().keys().hasAll(['participantIds', 'updatedAt'])
+                    && request.auth.uid in incoming().participantIds
+                    && incoming().participantIds is list
+                    && incoming().participantIds.size() == 2
+                    && (!('lastMessage' in incoming()) || incoming().lastMessage is string)
+                    && (!('lastMessageTime' in incoming()) || incoming().lastMessageTime is number);
+      allow update: if isSignedIn() && request.auth.uid in existing().participantIds
+                    && incoming().diff(existing()).affectedKeys().hasOnly(['updatedAt', 'lastMessage', 'lastMessageTime'])
+                    && (!('lastMessage' in incoming()) || incoming().lastMessage is string)
+                    && (!('lastMessageTime' in incoming()) || incoming().lastMessageTime is number);
+    }
+
+    match /chats/{chatId}/messages/{messageId} {
+      allow get, list: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
+      allow create: if isSignedIn() && isValidId(messageId)
+                    && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds
+                    && incoming().keys().hasAll(['authorId', 'text', 'createdAt'])
+                    && incoming().keys().size() == 3
+                    && incoming().authorId == request.auth.uid
+                    && incoming().text is string && incoming().text.size() > 0 && incoming().text.size() <= 2000
+                    && incoming().createdAt == request.time;
+      allow update: if false; // Messages are immutable
+      allow delete: if isSignedIn() && request.auth.uid == existing().authorId; 
+    }
+
   }
 }

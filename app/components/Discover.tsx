@@ -2,9 +2,10 @@
 
 import { useAuthStore } from '@/lib/auth-store';
 import { db } from '@/lib/firebase';
-import { collection, query, onSnapshot, orderBy, where, doc, setDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot, orderBy, where, doc, setDoc, getDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { Search, UserPlus, Clock } from 'lucide-react';
+import { Search, UserPlus, Clock, MessageCircle } from 'lucide-react';
+import { useToast } from './ui/use-toast';
 
 interface UserProfile {
   id: string;
@@ -16,9 +17,32 @@ interface UserProfile {
 
 export default function Discover() {
   const { user } = useAuthStore();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [friends, setFriends] = useState<Record<string, string>>({}); // id -> status
+
+  // ... 
+
+  const handleStartChat = async (targetId: string) => {
+    if (!user) return;
+    // We just create a chat and navigate to it? Or just create it.
+    // Assuming UI handles navigation to active chat, but since it's controlled in page.tsx, we could just create it here.
+    // In a real app we'd trigger navigation. Let's redirect to messages or show a toast.
+    const chatId = [user.uid, targetId].sort().join('_');
+    const chatDoc = doc(db, 'chats', chatId);
+    const snap = await getDoc(chatDoc);
+    if (!snap.exists()) {
+      await setDoc(chatDoc, {
+        participantIds: [user.uid, targetId],
+        updatedAt: Date.now()
+      });
+    }
+    toast({
+      title: "Chat active",
+      description: "Navigate to Messages to see your chat.",
+    });
+  };
 
   useEffect(() => {
     if (!searchQuery.trim()) {
@@ -117,19 +141,27 @@ export default function Discover() {
                     </div>
                  </div>
                  
-                 <button 
-                   onClick={() => handleSendRequest(u.id)}
-                   disabled={!!friends[u.id]}
-                   className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition ${
-                     friends[u.id] === 'accepted' ? 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 cursor-not-allowed' :
-                     friends[u.id] === 'pending' ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 cursor-not-allowed' :
-                     'bg-blue-600 text-white hover:bg-blue-700'
-                   }`}
-                 >
-                   {friends[u.id] === 'accepted' ? 'Friends' :
-                    friends[u.id] === 'pending' ? <><Clock className="w-4 h-4"/> Pending</> : 
-                    <><UserPlus className="w-4 h-4"/> Add</>}
-                 </button>
+                 <div className="flex gap-2">
+                   <button 
+                     onClick={() => handleStartChat(u.id)}
+                     className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                   >
+                     <MessageCircle className="w-4 h-4" /> Message
+                   </button>
+                   <button 
+                     onClick={() => handleSendRequest(u.id)}
+                     disabled={!!friends[u.id]}
+                     className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition ${
+                       friends[u.id] === 'accepted' ? 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 cursor-not-allowed' :
+                       friends[u.id] === 'pending' ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 cursor-not-allowed' :
+                       'bg-blue-600 text-white hover:bg-blue-700'
+                     }`}
+                   >
+                     {friends[u.id] === 'accepted' ? 'Friends' :
+                      friends[u.id] === 'pending' ? <><Clock className="w-4 h-4"/> Pending</> : 
+                      <><UserPlus className="w-4 h-4"/> Add</>}
+                   </button>
+                 </div>
                </div>
              ))}
           </div>
