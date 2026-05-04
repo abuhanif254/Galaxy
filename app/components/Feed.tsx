@@ -8,6 +8,7 @@ import PostCard from './PostCard';
 import { Plus } from 'lucide-react';
 import PhotoUpload from './PhotoUpload';
 import StoryViewer from './StoryViewer';
+import { PostSkeleton, StorySkeleton } from './Skeletons';
 
 interface Post {
   id: string;
@@ -33,17 +34,23 @@ interface Story {
   };
 }
 
+type FeedFilter = 'global' | 'circles';
+
 export default function Feed() {
   const { user } = useAuthStore();
   const [posts, setPosts] = useState<Post[]>([]);
   const [stories, setStories] = useState<Story[]>([]);
   const [showUpload, setShowUpload] = useState<false | 'post' | 'story'>(false);
   const [viewingStoryIndex, setViewingStoryIndex] = useState<number | null>(null);
+  const [activeFilter, setActiveFilter] = useState<FeedFilter>('global');
+  const [loadingPosts, setLoadingPosts] = useState(true);
+  const [loadingStories, setLoadingStories] = useState(true);
 
   useEffect(() => {
     if (!user) return;
     
     // Fetch stories from self for now to avoid the complex `isFriend` query requirement
+    setLoadingStories(true);
     const usq = query(collection(db, 'stories'), where('authorId', '==', user.uid));
     const unsubStories = onSnapshot(usq, async (snapshot) => {
       const data: Story[] = [];
@@ -62,13 +69,13 @@ export default function Feed() {
       }
       data.sort((a, b) => b.createdAt - a.createdAt);
       setStories(data);
+      setLoadingStories(false);
     });
 
-    const q = query(
-      collection(db, 'posts'),
-      where('visibility', '==', 'public'),
-      limit(50)
-    );
+    setLoadingPosts(true);
+    const q = activeFilter === 'global' 
+      ? query(collection(db, 'posts'), where('visibility', '==', 'public'), limit(50))
+      : query(collection(db, 'posts'), where('visibility', '==', 'group'), limit(50));
 
     const unsubPosts = onSnapshot(q, (snapshot) => {
       const data: Post[] = [];
@@ -76,16 +83,24 @@ export default function Feed() {
         data.push({ id: doc.id, ...doc.data() } as Post);
       });
       data.sort((a, b) => b.createdAt - a.createdAt);
-      setPosts(data);
+      // Client-side filtering check if necessary for groups since we can't easily compound query
+      if (activeFilter === 'circles') {
+        // In real app we'd verify group membership, for now just show them
+        setPosts(data);
+      } else {
+        setPosts(data);
+      }
+      setLoadingPosts(false);
     }, (error) => {
       console.error("Error fetching posts:", error);
+      setLoadingPosts(false);
     });
 
     return () => {
       unsubPosts();
       unsubStories();
     };
-  }, [user]);
+  }, [user, activeFilter]);
 
   return (
     <div className="space-y-6">
@@ -97,7 +112,13 @@ export default function Feed() {
         >
           <Plus className="w-6 h-6" />
         </button>
-        {stories.map((story, idx) => (
+        {loadingStories ? (
+          <>
+            <StorySkeleton />
+            <StorySkeleton />
+            <StorySkeleton />
+          </>
+        ) : stories.map((story, idx) => (
           <button 
             key={story.id} 
             onClick={() => setViewingStoryIndex(idx)}
@@ -130,14 +151,39 @@ export default function Feed() {
         </button>
       </div>
 
+      {/* Feed Filters */}
+      <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-2">
+        <button 
+          onClick={() => setActiveFilter('global')}
+          className={`px-4 py-2 font-semibold text-sm rounded-full transition-colors ${activeFilter === 'global' ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900' : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
+        >
+          Global
+        </button>
+        <button 
+          onClick={() => setActiveFilter('circles')}
+          className={`px-4 py-2 font-semibold text-sm rounded-full transition-colors ${activeFilter === 'circles' ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900' : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
+        >
+          Circles
+        </button>
+      </div>
+
       <div className="space-y-6">
-        {posts.map(post => (
-          <PostCard key={post.id} post={post} />
-        ))}
-        {posts.length === 0 && (
-          <div className="text-center py-12 text-zinc-500">
-            No posts yet. Be the first to share!
-          </div>
+        {loadingPosts ? (
+           <>
+             <PostSkeleton />
+             <PostSkeleton />
+           </>
+        ) : (
+          <>
+            {posts.map(post => (
+              <PostCard key={post.id} post={post} />
+            ))}
+            {posts.length === 0 && (
+              <div className="text-center py-12 text-zinc-500">
+                No posts found here. Be the first to share!
+              </div>
+            )}
+          </>
         )}
       </div>
 

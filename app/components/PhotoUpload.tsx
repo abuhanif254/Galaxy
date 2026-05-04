@@ -7,6 +7,7 @@ import { db, storage, handleFirestoreError, OperationType } from '@/lib/firebase
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { X, Upload, Wand2, Plus } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
+import { useToast } from './ui/use-toast';
 
 interface Props {
   type: 'post' | 'story';
@@ -25,6 +26,7 @@ const FILTERS = [
 
 export default function PhotoUpload({ type, onClose }: Props) {
   const { user } = useAuthStore();
+  const { toast } = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [previewURL, setPreviewURL] = useState<string | null>(null);
   const [caption, setCaption] = useState('');
@@ -101,6 +103,10 @@ export default function PhotoUpload({ type, onClose }: Props) {
             commentCount: 0,
             createdAt: serverTimestamp(),
           });
+          toast({
+            title: "Success",
+            description: "Your post has been published.",
+          });
         } catch (error) {
           handleFirestoreError(error, OperationType.CREATE, `posts/${postId}`);
         }
@@ -113,6 +119,10 @@ export default function PhotoUpload({ type, onClose }: Props) {
             expiresAt: Date.now() + 24 * 60 * 60 * 1000,
             createdAt: serverTimestamp(),
           });
+          toast({
+            title: "Success",
+            description: "Your story has been shared.",
+          });
         } catch (error) {
            handleFirestoreError(error, OperationType.CREATE, `stories/${storyId}`);
         }
@@ -120,7 +130,10 @@ export default function PhotoUpload({ type, onClose }: Props) {
       onClose();
     } catch (e) {
       console.error(e);
-      alert("Error uploading image to storage. Please try again later.");
+      toast({
+        title: "Error",
+        description: "Error uploading image to storage. Please try again later.",
+      });
     } finally {
       setIsUploading(false);
     }
