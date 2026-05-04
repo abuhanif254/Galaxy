@@ -27,27 +27,28 @@ const FILTERS = [
 export default function PhotoUpload({ type, onClose }: Props) {
   const { user } = useAuthStore();
   const { toast } = useToast();
-  const [file, setFile] = useState<File | null>(null);
-  const [previewURL, setPreviewURL] = useState<string | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [previewURLs, setPreviewURLs] = useState<string[]>([]);
   const [caption, setCaption] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState(FILTERS[0].filter);
+  const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const { getRootProps, getInputProps } = useDropzone({
     accept: { 'image/*': [] },
-    maxFiles: 1,
+    maxFiles: type === 'post' ? 10 : 1,
     onDrop: (acceptedFiles) => {
-      const f = acceptedFiles[0];
-      setFile(f);
-      const url = URL.createObjectURL(f);
-      setPreviewURL(url);
+      setFiles(acceptedFiles);
+      const urls = acceptedFiles.map(f => URL.createObjectURL(f));
+      setPreviewURLs(urls);
+      setCurrentPreviewIndex(0);
     }
   });
 
-  const applyFilterToCanvasAndGetDataUrl = (): Promise<string> => {
+  const applyFilterToCanvasAndGetDataUrl = (url: string): Promise<string> => {
     return new Promise((resolve) => {
-      if (!previewURL) return resolve('');
+      if (!url) return resolve('');
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => {
@@ -76,27 +77,29 @@ export default function PhotoUpload({ type, onClose }: Props) {
         
         resolve(canvas.toDataURL('image/jpeg', 0.8));
       };
-      img.src = previewURL;
+      img.src = url;
     });
   };
 
   const handleSubmit = async () => {
-    if (!user || !previewURL || !storage) return;
+    if (!user || previewURLs.length === 0 || !storage) return;
     setIsUploading(true);
 
     try {
-      const finalImageDataUrl = await applyFilterToCanvasAndGetDataUrl();
-      
-      const imageRef = ref(storage, `images/${user.uid}/${Date.now()}.jpg`);
-      await uploadString(imageRef, finalImageDataUrl, 'data_url');
-      const downloadUrl = await getDownloadURL(imageRef);
+      const downloadUrls: string[] = [];
+      for (let i = 0; i < previewURLs.length; i++) {
+        const finalImageDataUrl = await applyFilterToCanvasAndGetDataUrl(previewURLs[i]);
+        const imageRef = ref(storage, `images/${user.uid}/${Date.now()}_${i}.jpg`);
+        await uploadString(imageRef, finalImageDataUrl, 'data_url');
+        downloadUrls.push(await getDownloadURL(imageRef));
+      }
       
       if (type === 'post') {
         const postId = `post_${Date.now()}`;
         try {
           await setDoc(doc(db, 'posts', postId), {
             authorId: user.uid,
-            imageUrl: downloadUrl,
+            imageUrls: downloadUrls,
             caption,
             visibility: 'public', // Simple default
             likeCount: 0,
@@ -115,7 +118,7 @@ export default function PhotoUpload({ type, onClose }: Props) {
         try {
            await setDoc(doc(db, 'stories', storyId), {
             authorId: user.uid,
-            imageUrl: downloadUrl,
+            imageUrl: downloadUrls[0], // Only first for story
             expiresAt: Date.now() + 24 * 60 * 60 * 1000,
             createdAt: serverTimestamp(),
           });
@@ -148,24 +151,38 @@ export default function PhotoUpload({ type, onClose }: Props) {
         <canvas ref={canvasRef} className="hidden" />
 
         <div className="bg-zinc-100 dark:bg-black/40 flex-1 relative flex items-center justify-center min-h-[50vh] md:min-h-[500px]">
-          {!previewURL ? (
+          {previewURLs.length === 0 ? (
             <div {...getRootProps()} className="w-full h-full flex flex-col items-center justify-center cursor-pointer p-8">
               <input {...getInputProps()} />
               <div className="w-20 h-20 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center text-blue-600 mb-6 font-semibold animate-pulse">
                 <Upload className="w-8 h-8" />
               </div>
-              <h3 className="text-xl font-bold mb-2 text-center text-zinc-900 dark:text-zinc-100">Select a photo to share</h3>
-              <p className="text-zinc-500 text-center max-w-[200px]">Drag and drop an image here, or click to browse</p>
+              <h3 className="text-xl font-bold mb-2 text-center text-zinc-900 dark:text-zinc-100">Select photos to share</h3>
+              <p className="text-zinc-500 text-center max-w-[200px]">Drag and drop images here, or click to browse</p>
             </div>
           ) : (
-             <div className="relative w-full h-full p-4 flex items-center justify-center">
-                {/* Visual Preview */}
-                <img 
-                  src={previewURL} 
-                  style={{ filter: selectedFilter }}
-                  className="max-w-full max-h-full object-contain shadow-lg border border-black/5 rounded-lg"
-                  alt="Preview" 
-                />
+             <div className="relative w-full h-full flex flex-col">
+                <div className="flex-1 p-4 flex items-center justify-center overflow-hidden">
+                  <img 
+                    src={previewURLs[currentPreviewIndex]} 
+                    style={{ filter: selectedFilter }}
+                    className="max-w-full max-h-full object-contain shadow-lg border border-black/5 rounded-lg"
+                    alt="Preview" 
+                  />
+                </div>
+                {previewURLs.length > 1 && (
+                  <div className="h-24 bg-white/50 dark:bg-black/50 backdrop-blur-md flex items-center gap-2 px-4 overflow-x-auto no-scrollbar">
+                    {previewURLs.map((url, i) => (
+                      <button 
+                        key={i} 
+                        onClick={() => setCurrentPreviewIndex(i)}
+                        className={`relative w-16 h-16 rounded-md overflow-hidden flex-shrink-0 transition-all ${i === currentPreviewIndex ? 'ring-2 ring-blue-500 opacity-100' : 'opacity-50 hover:opacity-100'}`}
+                      >
+                        <img src={url} style={{ filter: selectedFilter }} className="w-full h-full object-cover" alt="" />
+                      </button>
+                    ))}
+                  </div>
+                )}
              </div>
           )}
         </div>
@@ -177,7 +194,7 @@ export default function PhotoUpload({ type, onClose }: Props) {
           </div>
           
           <div className="p-5 space-y-6 flex-1">
-            {previewURL && (
+            {previewURLs.length > 0 && (
               <div>
                  <div className="flex items-center gap-2 mb-3 text-sm font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                     <Wand2 className="w-4 h-4"/>
@@ -192,7 +209,7 @@ export default function PhotoUpload({ type, onClose }: Props) {
                       >
                         <div className={`w-16 h-16 rounded-xl overflow-hidden transition-all duration-300 ring-offset-2 dark:ring-offset-zinc-900 ${selectedFilter === f.filter ? 'ring-2 ring-blue-500' : 'opacity-70 group-hover:opacity-100'}`}>
                           <img 
-                            src={previewURL} 
+                            src={previewURLs[0]} 
                             style={{ filter: f.filter }} 
                             className="w-full h-full object-cover" 
                             alt={f.name} 
@@ -220,7 +237,7 @@ export default function PhotoUpload({ type, onClose }: Props) {
           <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 mt-auto sticky bottom-0 z-10">
              <button 
                 onClick={handleSubmit}
-                disabled={!previewURL || isUploading}
+                disabled={previewURLs.length === 0 || isUploading}
                 className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:hover:bg-blue-600 text-white rounded-xl font-semibold shadow-sm transition-colors flex items-center justify-center gap-2"
               >
                 {isUploading ? 'Publishing...' : 'Publish'}

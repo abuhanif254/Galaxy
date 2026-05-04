@@ -12,7 +12,8 @@ import PostCard from './PostCard';
 interface Post {
   id: string;
   authorId: string;
-  imageUrl: string;
+  imageUrl?: string;
+  imageUrls?: string[];
   caption?: string;
   likeCount: number;
   commentCount: number;
@@ -210,7 +211,7 @@ export default function Profile() {
            >
              {posts.map(post => (
                <motion.div variants={itemVariants} key={post.id} className="break-inside-avoid mb-1 md:mb-4 bg-zinc-200 dark:bg-zinc-800 relative group overflow-hidden md:rounded-2xl cursor-pointer">
-                 <img src={post.imageUrl} alt="" className="w-full h-auto object-cover group-hover:scale-105 transition duration-500" />
+                 <img src={post.imageUrls?.[0] || post.imageUrl} alt="" className="w-full h-auto object-cover group-hover:scale-105 transition duration-500" />
                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
                     <div className="flex items-center gap-1 text-white font-semibold">
                       <span className="text-lg">❤️</span> {post.likeCount}

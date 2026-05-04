@@ -2,10 +2,21 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useAuthStore } from '@/lib/auth-store';
-import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
+import { db, handleFirestoreError, OperationType, storage } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, orderBy, doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { MessageCircle, Send, ArrowLeft, Search } from 'lucide-react';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { MessageCircle, Send, ArrowLeft, Search, Video, Phone, Mic, Square, ImagePlay } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import CallOverlay from './CallOverlay';
+
+const MOCK_GIFS = [
+  "https://media.giphy.com/media/cfuL5gqFDreXxkWQ4o/giphy.gif",
+  "https://media.giphy.com/media/HvvpNczg8Dcw8/giphy.gif",
+  "https://media.giphy.com/media/L3v3nO0E1c8280jB6D/giphy.gif",
+  "https://media.giphy.com/media/MDJ9IbxxvDUQM/giphy.gif",
+  "https://media.giphy.com/media/VbnUQpnihPSIgIXuZv/giphy.gif",
+  "https://media.giphy.com/media/3o7aD2saalEvTehEXe/giphy.gif"
+];
 
 interface Chat {
   id: string;
@@ -25,7 +36,9 @@ interface Chat {
 interface ChatMessage {
   id: string;
   authorId: string;
-  text: string;
+  text?: string;
+  audioUrl?: string;
+  imageUrl?: string;
   createdAt: number;
 }
 
@@ -36,6 +49,16 @@ export default function Messages() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showGifPicker, setShowGifPicker] = useState(false);
+  
+  // Call State
+  const [activeCall, setActiveCall] = useState<{ isVideo: boolean, user: any } | null>(null);
+  
+  // Voice Recording State
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -55,14 +78,10 @@ export default function Messages() {
         // Find the other participant's info
         const otherId = chat.participantIds.find(id => id !== user.uid);
         if (otherId) {
-          try {
-             const userDoc = await getDoc(doc(db, 'users', otherId));
-             if (userDoc.exists()) {
-               chat.otherUser = { id: otherId, ...userDoc.data() } as any;
-             }
-          } catch (e) {
-             console.error("Error fetching other user:", e);
-          }
+           const userDoc = await getDoc(doc(db, 'users', otherId));
+           if (userDoc.exists()) {
+             chat.otherUser = { id: otherId, ...userDoc.data() } as any;
+           }
         }
         data.push(chat);
       }
@@ -70,7 +89,6 @@ export default function Messages() {
       data.sort((a, b) => (b.lastMessageTime || b.updatedAt) - (a.lastMessageTime || a.updatedAt));
       setChats(data);
     }, (error) => {
-      console.error(error);
       handleFirestoreError(error, OperationType.LIST, 'chats');
     });
 
@@ -102,8 +120,8 @@ export default function Messages() {
     return () => unsub();
   }, [activeChat]);
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSendMessage = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!user || !activeChat || !newMessage.trim()) return;
 
     const msgText = newMessage.trim();
@@ -113,18 +131,91 @@ export default function Messages() {
     const now = Date.now();
 
     try {
-      // Create message
       await setDoc(doc(db, `chats/${activeChat.id}/messages`, messageId), {
         authorId: user.uid,
         text: msgText,
         createdAt: serverTimestamp(),
       });
       
-      // Update chat last message
       await updateDoc(doc(db, 'chats', activeChat.id), {
         lastMessage: msgText,
         lastMessageTime: now,
-        updatedAt: serverTimestamp(), // Wait, firestore rules enforce updatedAt == request.time but lastMessageTime we just pass Date.now() which is fine. But wait, `serverTimestamp()` on update matching request.time? Actually, if we use serverTimestamp() it becomes `request.time`. Our rule: `incoming().updatedAt == request.time`.
+        updatedAt: serverTimestamp(),
+      });
+    } catch (e) {
+      handleFirestoreError(e, OperationType.CREATE, `chats/${activeChat.id}/messages`);
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+         if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+         // Upload to Firebase
+         if (!user || !activeChat) return;
+         try {
+            const fileName = `audio_${Date.now()}.webm`;
+            const audioRef = ref(storage, `chats/${activeChat.id}/${fileName}`);
+            await uploadBytes(audioRef, audioBlob);
+            const downloadUrl = await getDownloadURL(audioRef);
+
+            const messageId = `msg_${Date.now()}_${Math.random().toString(36).substring(2,9)}`;
+            await setDoc(doc(db, `chats/${activeChat.id}/messages`, messageId), {
+              authorId: user.uid,
+              audioUrl: downloadUrl,
+              createdAt: serverTimestamp(),
+            });
+            
+            await updateDoc(doc(db, 'chats', activeChat.id), {
+              lastMessage: '🎤 Voice message',
+              lastMessageTime: Date.now(),
+              updatedAt: serverTimestamp(),
+            });
+         } catch (e) {
+            console.error(e);
+         }
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch (err) {
+      console.error("Microphone access denied:", err);
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stream.getTracks().forEach(t => t.stop());
+      setIsRecording(false);
+    }
+  };
+
+  const handleSendGif = async (url: string) => {
+    if (!user || !activeChat) return;
+    setShowGifPicker(false);
+
+    const messageId = `msg_${Date.now()}_${Math.random().toString(36).substring(2,9)}`;
+    try {
+      await setDoc(doc(db, `chats/${activeChat.id}/messages`, messageId), {
+        authorId: user.uid,
+        imageUrl: url,
+        createdAt: serverTimestamp(),
+      });
+      
+      await updateDoc(doc(db, 'chats', activeChat.id), {
+        lastMessage: 'GIF message',
+        lastMessageTime: Date.now(),
+        updatedAt: serverTimestamp(),
       });
     } catch (e) {
       handleFirestoreError(e, OperationType.CREATE, `chats/${activeChat.id}/messages`);
@@ -137,8 +228,16 @@ export default function Messages() {
   );
 
   return (
-    <div className="flex h-[calc(100vh-140px)] md:h-[calc(100vh-100px)] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl overflow-hidden shadow-sm">
+    <div className="flex h-[calc(100vh-140px)] md:h-[calc(100vh-100px)] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl overflow-hidden shadow-sm relative">
       
+      {activeCall && (
+        <CallOverlay 
+           remoteUser={activeCall.user} 
+           isVideo={activeCall.isVideo}
+           onClose={() => setActiveCall(null)} 
+        />
+      )}
+
       {/* Sidebar - Chat List */}
       <div className={`w-full md:w-[320px] flex flex-col border-r border-zinc-200 dark:border-zinc-800 ${activeChat ? 'hidden md:flex' : 'flex'}`}>
         <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 space-y-4">
@@ -198,7 +297,7 @@ export default function Messages() {
       </div>
 
       {/* Main Chat Area */}
-      <div className={`flex-1 flex flex-col bg-zinc-50/50 dark:bg-zinc-950/50 ${!activeChat ? 'hidden md:flex' : 'flex'}`}>
+      <div className={`flex-1 flex flex-col bg-zinc-50/50 dark:bg-zinc-950/50 ${!activeChat ? 'hidden md:flex' : 'flex'} relative`}>
          {!activeChat ? (
             <div className="flex-1 flex flex-col items-center justify-center text-zinc-500">
                <MessageCircle className="w-16 h-16 text-zinc-300 dark:text-zinc-800 mb-4" />
@@ -221,7 +320,22 @@ export default function Messages() {
                       <img src={`https://api.dicebear.com/9.x/notionists/svg?seed=${activeChat.otherUser?.username}`} className="w-full h-full object-cover" />
                     )}
                  </div>
-                 <div className="font-semibold">{activeChat.otherUser?.displayName}</div>
+                 <div className="font-semibold flex-1">{activeChat.otherUser?.displayName}</div>
+                 
+                 <div className="flex items-center gap-1">
+                    <button 
+                      onClick={() => setActiveCall({ isVideo: false, user: activeChat.otherUser })}
+                      className="p-2.5 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 dark:hover:text-white dark:hover:bg-zinc-800 rounded-full transition-colors"
+                    >
+                      <Phone className="w-5 h-5" />
+                    </button>
+                    <button 
+                      onClick={() => setActiveCall({ isVideo: true, user: activeChat.otherUser })}
+                      className="p-2.5 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 dark:hover:text-white dark:hover:bg-zinc-800 rounded-full transition-colors"
+                    >
+                      <Video className="w-5 h-5" />
+                    </button>
+                 </div>
                </div>
 
                {/* Chat Messages */}
@@ -230,12 +344,14 @@ export default function Messages() {
                    const isMe = msg.authorId === user?.uid;
                    return (
                      <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-[15px] ${
-                          isMe 
-                            ? 'bg-blue-600 text-white rounded-br-sm' 
-                            : 'bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 rounded-bl-sm'
-                        }`}>
-                          {msg.text}
+                        <div className={`max-w-[85%] sm:max-w-[75%] ${msg.imageUrl ? 'bg-transparent' : isMe ? 'bg-blue-600 text-white rounded-2xl rounded-br-sm px-4 py-2.5' : 'bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 rounded-2xl rounded-bl-sm px-4 py-2.5'} text-[15px]`}>
+                          {msg.audioUrl ? (
+                             <audio controls src={msg.audioUrl} className={isMe ? 'invert hue-rotate-180 brightness-200 contrast-150 h-10 w-48 sm:w-64' : 'h-10 w-48 sm:w-64'} />
+                          ) : msg.imageUrl ? (
+                             <img src={msg.imageUrl} alt="GIF" className="rounded-2xl max-w-full max-h-48 object-cover" />
+                          ) : (
+                             msg.text
+                          )}
                         </div>
                      </div>
                    );
@@ -243,23 +359,64 @@ export default function Messages() {
                  <div ref={messagesEndRef} />
                </div>
 
+               {/* GIF Picker Popup */}
+               {showGifPicker && (
+                  <div className="absolute bottom-20 right-4 sm:right-20 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xl rounded-2xl p-3 w-72 z-20">
+                    <h3 className="text-xs font-bold text-zinc-500 mb-2 uppercase tracking-tight">Select GIF (Mock)</h3>
+                    <div className="grid grid-cols-2 gap-2 h-48 overflow-y-auto pr-1">
+                       {MOCK_GIFS.map((gif, i) => (
+                         <div key={i} onClick={() => handleSendGif(gif)} className="cursor-pointer rounded-lg overflow-hidden h-20 bg-zinc-100 hover:opacity-80 transition relative">
+                            <img src={gif} className="w-full h-full object-cover" alt="GIF" />
+                         </div>
+                       ))}
+                    </div>
+                  </div>
+               )}
+
                {/* Chat Input */}
                <div className="p-4 bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 shrink-0">
                   <form onSubmit={handleSendMessage} className="flex gap-2">
+                    <button 
+                       type="button" 
+                       onClick={() => setShowGifPicker(!showGifPicker)} 
+                       className={`p-3 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors ${showGifPicker ? 'text-blue-500' : ''}`}
+                    >
+                       <ImagePlay className="w-6 h-6" />
+                    </button>
                     <input 
                       type="text" 
                       value={newMessage}
                       onChange={e => setNewMessage(e.target.value)}
-                      placeholder="Message..."
-                      className="flex-1 bg-zinc-100 dark:bg-zinc-800 px-4 py-3 rounded-full text-[15px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder={isRecording ? "Recording..." : "Message..."}
+                      disabled={isRecording}
+                      className="flex-1 bg-zinc-100 dark:bg-zinc-800 px-4 py-3 rounded-full text-[15px] focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 min-w-0"
                     />
-                    <button 
-                      type="submit"
-                      disabled={!newMessage.trim()}
-                      className="w-12 h-12 flex-shrink-0 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:hover:bg-blue-600 text-white rounded-full flex items-center justify-center transition-colors"
-                    >
-                      <Send className="w-5 h-5 -ml-0.5" />
-                    </button>
+                    {newMessage.trim() === '' ? (
+                       isRecording ? (
+                          <button 
+                            type="button"
+                            onClick={stopRecording}
+                            className="w-12 h-12 flex-shrink-0 bg-red-500 hover:bg-red-600 animate-pulse text-white rounded-full flex items-center justify-center transition-colors"
+                          >
+                            <Square className="w-5 h-5 fill-white" />
+                          </button>
+                       ) : (
+                         <button 
+                           type="button"
+                           onClick={startRecording}
+                           className="w-12 h-12 flex-shrink-0 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-400 dark:text-zinc-300 hover:text-zinc-800 dark:hover:text-white rounded-full flex items-center justify-center transition-colors"
+                         >
+                           <Mic className="w-5 h-5" />
+                         </button>
+                       )
+                    ) : (
+                      <button 
+                        type="submit"
+                        className="w-12 h-12 flex-shrink-0 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center transition-colors"
+                      >
+                        <Send className="w-5 h-5 -ml-0.5" />
+                      </button>
+                    )}
                   </form>
                </div>
             </>

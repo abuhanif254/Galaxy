@@ -91,10 +91,12 @@ service cloud.firestore {
 
     // --- Posts ---
     function isValidPost(data) {
-      return data.keys().hasAll(['authorId', 'imageUrl', 'visibility', 'likeCount', 'commentCount', 'createdAt'])
+      return data.keys().hasAll(['authorId', 'visibility', 'likeCount', 'commentCount', 'createdAt'])
+        && data.keys().hasAny(['imageUrl', 'imageUrls'])
         && (data.keys().size() >= 6 && data.keys().size() <= 8)
         && data.authorId == request.auth.uid
-        && data.imageUrl is string && data.imageUrl.size() <= 2000
+        && (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() <= 2000))
+        && (!('imageUrls' in data) || (data.imageUrls is list && data.imageUrls.size() > 0 && data.imageUrls.size() <= 10 && data.imageUrls[0] is string))
         && data.visibility in ['public', 'friends', 'group']
         && (data.visibility != 'group' || (data.keys().hasAll(['groupId']) && data.groupId is string && isMemberOfGroup(data.groupId, request.auth.uid)))
         && (!('caption' in data) || (data.caption is string && data.caption.size() <= 2200))
@@ -148,10 +150,13 @@ service cloud.firestore {
       allow get, list: if isSignedIn() && exists(/databases/$(database)/documents/posts/$(postId));
       allow create: if isSignedIn() && isValidId(commentId)
                     && get(/databases/$(database)/documents/posts/$(postId)) != null
-                    && incoming().keys().hasAll(['authorId', 'text', 'createdAt'])
-                    && (incoming().keys().size() == 3 || (incoming().keys().size() == 4 && 'parentId' in incoming() && incoming().parentId is string && incoming().parentId.size() <= 128))
+                    && incoming().keys().hasAll(['authorId', 'createdAt'])
+                    && incoming().keys().hasAny(['text', 'imageUrl'])
+                    && (incoming().keys().size() >= 3 && incoming().keys().size() <= 6)
                     && incoming().authorId == request.auth.uid
-                    && incoming().text is string && incoming().text.size() > 0 && incoming().text.size() <= 500
+                    && (!('text' in incoming()) || (incoming().text is string && incoming().text.size() <= 500))
+                    && (!('imageUrl' in incoming()) || (incoming().imageUrl is string && incoming().imageUrl.size() <= 1000))
+                    && (!('parentId' in incoming()) || (incoming().parentId is string && incoming().parentId.size() <= 128))
                     && incoming().createdAt == request.time;
       allow delete: if isSignedIn() && (request.auth.uid == existing().authorId || request.auth.uid == get(/databases/$(database)/documents/posts/$(postId)).data.authorId);
     }
@@ -235,10 +240,12 @@ service cloud.firestore {
       allow get, list: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
       allow create: if isSignedIn() && isValidId(messageId)
                     && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds
-                    && incoming().keys().hasAll(['authorId', 'text', 'createdAt'])
-                    && incoming().keys().size() == 3
+                    && incoming().keys().hasAll(['authorId', 'createdAt'])
+                    && incoming().keys().hasAny(['text', 'audioUrl', 'imageUrl'])
                     && incoming().authorId == request.auth.uid
-                    && incoming().text is string && incoming().text.size() > 0 && incoming().text.size() <= 2000
+                    && (!('text' in incoming()) || (incoming().text is string && incoming().text.size() <= 2000))
+                    && (!('audioUrl' in incoming()) || (incoming().audioUrl is string && incoming().audioUrl.size() <= 2000))
+                    && (!('imageUrl' in incoming()) || (incoming().imageUrl is string && incoming().imageUrl.size() <= 2000))
                     && incoming().createdAt == request.time;
       allow update: if false; // Messages are immutable
       allow delete: if isSignedIn() && request.auth.uid == existing().authorId; 

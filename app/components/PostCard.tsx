@@ -3,7 +3,7 @@
 import { useAuthStore } from '@/lib/auth-store';
 import { db } from '@/lib/firebase';
 import { collection, doc, query, onSnapshot, setDoc, deleteDoc, orderBy, serverTimestamp, getDocs, where } from 'firebase/firestore';
-import { MessageCircle, Heart, Share, MoreHorizontal } from 'lucide-react';
+import { MessageCircle, Heart, Share, MoreHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { useToast } from './ui/use-toast';
@@ -12,7 +12,8 @@ import { motion, AnimatePresence } from 'motion/react';
 interface Post {
   id: string;
   authorId: string;
-  imageUrl: string;
+  imageUrl?: string;
+  imageUrls?: string[];
   caption?: string;
   likeCount: number;
   commentCount: number;
@@ -43,6 +44,9 @@ export default function PostCard({ post }: { post: Post }) {
   const [newComment, setNewComment] = useState('');
   const [replyingTo, setReplyingTo] = useState<{ id: string, username: string } | null>(null);
   const [showHeartOverlay, setShowHeartOverlay] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  const images = post.imageUrls || (post.imageUrl ? [post.imageUrl] : []);
 
   // Fetch Author Info
   useEffect(() => {
@@ -152,6 +156,14 @@ export default function PostCard({ post }: { post: Post }) {
     });
   };
 
+  const nextImage = () => {
+    if (currentImageIndex < images.length - 1) setCurrentImageIndex(i => i + 1);
+  };
+
+  const prevImage = () => {
+    if (currentImageIndex > 0) setCurrentImageIndex(i => i - 1);
+  };
+
   // Organize comments into threads
   const topLevelComments = comments.filter(c => !c.parentId);
   const repliesByParentId = comments.reduce((acc, c) => {
@@ -184,13 +196,40 @@ export default function PostCard({ post }: { post: Post }) {
         </button>
       </div>
 
-      {/* Image */}
-      <div className="w-full bg-black flex items-center justify-center max-h-[600px] overflow-hidden relative" onDoubleClick={handleDoubleClickLike}>
-        <img 
-          src={post.imageUrl} 
-          alt="Post content" 
-          className="w-full object-contain"
-        />
+      {/* Image Carousel */}
+      <div className="w-full bg-black flex items-center justify-center max-h-[600px] overflow-hidden relative group" onDoubleClick={handleDoubleClickLike}>
+        {images.length > 0 && (
+          <div className="w-full h-full relative transition-transform duration-300" style={{ transform: `translateX(-${currentImageIndex * 100}%)`, display: 'flex' }}>
+            {images.map((img, i) => (
+              <img 
+                key={i}
+                src={img} 
+                alt="Post content" 
+                className="w-full flex-shrink-0 object-contain max-h-[600px]"
+              />
+            ))}
+          </div>
+        )}
+        
+        {images.length > 1 && currentImageIndex > 0 && (
+          <button onClick={(e) => { e.stopPropagation(); prevImage(); }} className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 bg-black/40 hover:bg-black/80 rounded-full text-white backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity">
+            <ChevronLeft className="w-6 h-6" />
+          </button>
+        )}
+        {images.length > 1 && currentImageIndex < images.length - 1 && (
+          <button onClick={(e) => { e.stopPropagation(); nextImage(); }} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-black/40 hover:bg-black/80 rounded-full text-white backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity">
+            <ChevronRight className="w-6 h-6" />
+          </button>
+        )}
+        
+        {images.length > 1 && (
+          <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5 z-10">
+            {images.map((_, i) => (
+              <div key={i} className={`h-1.5 rounded-full transition-all duration-300 ${i === currentImageIndex ? 'w-4 bg-blue-500' : 'w-1.5 bg-white/60'}`} />
+            ))}
+          </div>
+        )}
+
         <AnimatePresence>
           {showHeartOverlay && (
             <motion.div 
@@ -198,7 +237,7 @@ export default function PostCard({ post }: { post: Post }) {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
               transition={{ type: "spring", stiffness: 300, damping: 20 }}
-              className="absolute inset-0 flex items-center justify-center pointer-events-none"
+              className="absolute inset-0 flex items-center justify-center pointer-events-none z-20"
             >
                <Heart className="w-32 h-32 fill-white text-white drop-shadow-2xl" />
             </motion.div>

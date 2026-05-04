@@ -14,7 +14,8 @@ import { motion } from 'motion/react';
 interface Post {
   id: string;
   authorId: string;
-  imageUrl: string;
+  imageUrl?: string;
+  imageUrls?: string[];
   caption?: string;
   visibility: 'public' | 'friends' | 'group';
   groupId?: string;
