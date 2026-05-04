@@ -1,0 +1,163 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile data",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string" },
+        "username": { "type": "string" },
+        "avatarUrl": { "type": "string" },
+        "bio": { "type": "string" },
+        "createdAt": { "type": "number", "description": "Timestamp" }
+      },
+      "required": ["displayName", "username", "createdAt"]
+    },
+    "UserSecret": {
+      "title": "UserSecret",
+      "description": "Private user info like email",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" }
+      },
+      "required": ["email"]
+    },
+    "Friend": {
+      "title": "Friend",
+      "description": "Friendship record",
+      "type": "object",
+      "properties": {
+        "status": { "type": "string", "enum": ["pending", "accepted"] },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["status", "createdAt"]
+    },
+    "Post": {
+      "title": "Post",
+      "description": "Photo post",
+      "type": "object",
+      "properties": {
+        "authorId": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "caption": { "type": "string" },
+        "visibility": { "type": "string", "enum": ["public", "friends", "group"] },
+        "groupId": { "type": "string" },
+        "likeCount": { "type": "number" },
+        "commentCount": { "type": "number" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["authorId", "imageUrl", "visibility", "likeCount", "commentCount", "createdAt"]
+    },
+    "PostLike": {
+      "title": "PostLike",
+      "description": "A user's like on a post",
+      "type": "object",
+      "properties": {
+        "createdAt": { "type": "number" }
+      },
+      "required": ["createdAt"]
+    },
+    "PostComment": {
+      "title": "PostComment",
+      "description": "A comment on a post",
+      "type": "object",
+      "properties": {
+        "authorId": { "type": "string" },
+        "text": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["authorId", "text", "createdAt"]
+    },
+    "Group": {
+      "title": "Group",
+      "description": "Private circle of people",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "memberCount": { "type": "number" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["name", "ownerId", "memberCount", "createdAt"]
+    },
+    "GroupMember": {
+      "title": "GroupMember",
+      "description": "Membership in a group",
+      "type": "object",
+      "properties": {
+        "role": { "type": "string", "enum": ["owner", "admin", "member"] },
+        "joinedAt": { "type": "number" }
+      },
+      "required": ["role", "joinedAt"]
+    },
+    "Story": {
+      "title": "Story",
+      "description": "Ephemeral photo story",
+      "type": "object",
+      "properties": {
+        "authorId": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "expiresAt": { "type": "number" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["authorId", "imageUrl", "expiresAt", "createdAt"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "User notification",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["like", "comment", "friend_request", "group_invite"] },
+        "actorId": { "type": "string" },
+        "relatedEntityId": { "type": "string" },
+        "message": { "type": "string" },
+        "isRead": { "type": "boolean" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["type", "actorId", "isRead", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Public user profiles"
+    },
+    "/users/{userId}/private/info": {
+      "schema": { "$ref": "#/entities/UserSecret" },
+      "description": "Private user information (email)"
+    },
+    "/users/{userId}/friends/{friendId}": {
+      "schema": { "$ref": "#/entities/Friend" },
+      "description": "Friends of the user. Only friends can see 'friends' visibility posts."
+    },
+    "/users/{userId}/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/Notification" },
+      "description": "Notifications for the user"
+    },
+    "/posts/{postId}": {
+      "schema": { "$ref": "#/entities/Post" },
+      "description": "All posts"
+    },
+    "/posts/{postId}/likes/{userId}": {
+      "schema": { "$ref": "#/entities/PostLike" },
+      "description": "Likes on a post. userId must match document ID."
+    },
+    "/posts/{postId}/comments/{commentId}": {
+      "schema": { "$ref": "#/entities/PostComment" },
+      "description": "Comments on a post"
+    },
+    "/groups/{groupId}": {
+      "schema": { "$ref": "#/entities/Group" },
+      "description": "Private groups"
+    },
+    "/groups/{groupId}/members/{userId}": {
+      "schema": { "$ref": "#/entities/GroupMember" },
+      "description": "Members of a group. Document ID is userId."
+    },
+    "/stories/{storyId}": {
+      "schema": { "$ref": "#/entities/Story" },
+      "description": "User stories"
+    }
+  }
+}
