@@ -4,7 +4,7 @@ import { useAuthStore } from '@/lib/auth-store';
 import { db } from '@/lib/firebase';
 import { collection, query, onSnapshot, doc, updateDoc, orderBy } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { Bell, Heart, MessageCircle } from 'lucide-react';
+import { Bell, Heart, MessageCircle, AtSign } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 interface Notification {
@@ -59,8 +59,8 @@ export default function Notifications() {
             onClick={() => markRead(n.id, n.isRead)}
             className={`p-4 rounded-2xl flex items-start gap-4 transition cursor-pointer ${n.isRead ? 'bg-zinc-50 dark:bg-zinc-900/50' : 'bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30'}`}
           >
-             <div className={`p-2 rounded-full ${n.type === 'like' ? 'bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400' : 'bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400'}`}>
-                {n.type === 'like' ? <Heart className="w-5 h-5"/> : <MessageCircle className="w-5 h-5"/>}
+             <div className={`p-2 rounded-full ${n.type === 'like' ? 'bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400' : n.type === 'mention' ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400' : 'bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400'}`}>
+                {n.type === 'like' ? <Heart className="w-5 h-5"/> : n.type === 'mention' ? <AtSign className="w-5 h-5"/> : <MessageCircle className="w-5 h-5"/>}
              </div>
              <div>
                 <p className={`text-[15px] ${n.isRead ? 'text-zinc-600 dark:text-zinc-300' : 'text-zinc-900 dark:text-zinc-50 font-medium'}`}>{n.message}</p>

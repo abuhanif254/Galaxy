@@ -77,7 +77,7 @@ service cloud.firestore {
                     && exists(/databases/$(database)/documents/users/$(userId))
                     && incoming().keys().hasAll(['type', 'actorId', 'relatedEntityId', 'message', 'isRead', 'createdAt'])
                     && incoming().keys().size() == 6
-                    && incoming().type in ['like', 'comment', 'friend_request', 'group_invite']
+                    && incoming().type in ['like', 'comment', 'friend_request', 'group_invite', 'mention']
                     && incoming().actorId == request.auth.uid
                     && incoming().relatedEntityId is string && incoming().relatedEntityId.size() <= 128
                     && incoming().message is string && incoming().message.size() <= 256
@@ -149,7 +149,7 @@ service cloud.firestore {
       allow create: if isSignedIn() && isValidId(commentId)
                     && get(/databases/$(database)/documents/posts/$(postId)) != null
                     && incoming().keys().hasAll(['authorId', 'text', 'createdAt'])
-                    && incoming().keys().size() == 3
+                    && (incoming().keys().size() == 3 || (incoming().keys().size() == 4 && 'parentId' in incoming() && incoming().parentId is string && incoming().parentId.size() <= 128))
                     && incoming().authorId == request.auth.uid
                     && incoming().text is string && incoming().text.size() > 0 && incoming().text.size() <= 500
                     && incoming().createdAt == request.time;

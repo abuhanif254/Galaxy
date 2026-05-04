@@ -206,11 +206,11 @@ export default function Profile() {
              variants={containerVariants}
              initial="hidden"
              animate="show"
-             className="grid grid-cols-3 gap-1 md:gap-4"
+             className="columns-2 md:columns-3 gap-1 md:gap-4"
            >
              {posts.map(post => (
-               <motion.div variants={itemVariants} key={post.id} className="aspect-square bg-zinc-200 dark:bg-zinc-800 relative group overflow-hidden md:rounded-2xl cursor-pointer">
-                 <img src={post.imageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+               <motion.div variants={itemVariants} key={post.id} className="break-inside-avoid mb-1 md:mb-4 bg-zinc-200 dark:bg-zinc-800 relative group overflow-hidden md:rounded-2xl cursor-pointer">
+                 <img src={post.imageUrl} alt="" className="w-full h-auto object-cover group-hover:scale-105 transition duration-500" />
                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
                     <div className="flex items-center gap-1 text-white font-semibold">
                       <span className="text-lg">❤️</span> {post.likeCount}
